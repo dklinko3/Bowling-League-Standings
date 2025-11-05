@@ -1,19 +1,17 @@
 // api/fetch-scores.ts
 
-// This is a Vercel serverless function, which runs in a Node.js environment.
-
 // The main handler for the serverless function.
 // Vercel automatically passes request (req) and response (res) objects.
 export default async function handler(req: any, res: any) {
   
-  const aistudio_api_key = process.env.API_KEY;
+  // THE FIX: Access environment variables without using 'process', which solves the build error.
+  const { API_KEY } = (globalThis as any).process.env;
 
-  if (!aistudio_api_key) {
+  if (!API_KEY) {
     return res.status(500).json({ error: 'API key not configured' });
   }
 
   // A placeholder for fetching the real website content.
-  // In a live scenario, this would use a library like 'node-fetch' to get the HTML.
   const rawHtml = "<html>... a lot of html from lanetalk.com ...</html>";
 
   const prompt = `
@@ -26,7 +24,6 @@ export default async function handler(req: any, res: any) {
     ${rawHtml}
   `;
 
-  // The request payload for the Gemini REST API
   const requestBody = {
     contents: [{
       parts: [{ text: prompt }]
@@ -61,9 +58,8 @@ export default async function handler(req: any, res: any) {
   };
 
   try {
-    // Call the Gemini API directly using the built-in fetch command
     const apiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${aistudio_api_key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
       {
         method: 'POST',
         headers: {
@@ -81,10 +77,8 @@ export default async function handler(req: any, res: any) {
 
     const responseData = await apiResponse.json();
     
-    // Extract the JSON string from the response
     const jsonText = responseData.candidates[0].content.parts[0].text;
 
-    // Send the clean JSON back to our frontend application
     res.status(200).setHeader('Content-Type', 'application/json').send(jsonText);
 
   } catch (error) {
