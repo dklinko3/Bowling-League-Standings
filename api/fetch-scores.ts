@@ -1,7 +1,10 @@
-// This is the code for your new 'helper program'
-// Save it as a new file, e.g., api/fetch-scores.ts
+// api/fetch-scores.ts
 
-import { GoogleGenAI, Type } from "@google/genai";
+// Add this line at the top to fix the 'process' error
+declare const process: any;
+
+// Change this line to use a full URL, so the server knows where to find the code
+import { GoogleGenAI, Type } from "https://esm.sh/@google/genai";
 
 // This is a placeholder for a function that fetches the raw HTML.
 // In a real environment (like Node.js), you'd use a library like 'node-fetch' or 'axios'.
