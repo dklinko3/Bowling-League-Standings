@@ -1,89 +1,94 @@
 // api/fetch-scores.ts
 
-// THIS IS THE FIX: Tell Vercel to run this on the Edge, which supports URL imports
-export const config = {
-  runtime: 'edge',
-};
+// This is a Vercel serverless function, which runs in a Node.js environment.
 
-// Import the library from a URL, which the Edge runtime understands
-import { GoogleGenAI, Type } from "https://esm.sh/@google/genai";
-
-// This is a placeholder for a function that fetches the raw HTML.
-async function fetchWebsiteContent(url: string): Promise<string> {
-  console.log(`Pretending to fetch HTML content from: ${url}`);
-  // In a real server environment, this would be replaced with a library like node-fetch
-  return "<html>... a lot of html from lanetalk.com ...</html>";
-}
-
-// The main function, updated for the Edge runtime
-export default async function handler(request: Request) {
-  const LANE_TALK_URL = 'https://www.lanetalk.com/leagues/top-dawg-classic/scores';
-  // Vercel makes environment variables available on process.env in Edge functions
+// The main handler for the serverless function.
+// Vercel automatically passes request (req) and response (res) objects.
+export default async function handler(req: any, res: any) {
+  
   const aistudio_api_key = process.env.API_KEY;
 
   if (!aistudio_api_key) {
-    return new Response(JSON.stringify({ error: 'API key not configured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return res.status(500).json({ error: 'API key not configured' });
   }
 
-  try {
-    const rawHtml = await fetchWebsiteContent(LANE_TALK_URL);
+  // A placeholder for fetching the real website content.
+  // In a live scenario, this would use a library like 'node-fetch' to get the HTML.
+  const rawHtml = "<html>... a lot of html from lanetalk.com ...</html>";
 
-    const ai = new GoogleGenAI({ apiKey: aistudio_api_key });
-    const prompt = `
-      From the following raw HTML content from a bowling website, extract the scores for the "Top Dawg Classic" league for the most recent date available.
-      Identify each team and the bowlers on that team. For each bowler, provide their three game scores.
-      Some bowlers might be absent; their scores should be [0, 0, 0].
-      Provide only a valid JSON response based on the required schema. Do not include any other text or markdown formatting.
+  const prompt = `
+    From the following raw HTML content from a bowling website, extract the scores for the "Top Dawg Classic" league for the most recent date available.
+    Identify each team and the bowlers on that team. For each bowler, provide their three game scores.
+    Some bowlers might be absent; their scores should be [0, 0, 0].
+    Provide only a valid JSON response based on the required schema. Do not include any other text or markdown formatting.
 
-      HTML Content:
-      ${rawHtml}
-    `;
+    HTML Content:
+    ${rawHtml}
+  `;
 
-    const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    teamScores: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                teamName: { type: Type.STRING },
-                                bowlerScores: {
-                                    type: Type.ARRAY,
-                                    items: {
-                                        type: Type.OBJECT,
-                                        properties: {
-                                            bowlerName: { type: Type.STRING },
-                                            scores: { type: Type.ARRAY, items: { type: Type.INTEGER } }
-                                        },
-                                    }
-                                }
-                            },
-                        }
-                    }
-                },
+  // The request payload for the Gemini REST API
+  const requestBody = {
+    contents: [{
+      parts: [{ text: prompt }]
+    }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          teamScores: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                teamName: { type: "STRING" },
+                bowlerScores: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      bowlerName: { type: "STRING" },
+                      scores: { type: "ARRAY", items: { type: "INTEGER" } }
+                    },
+                  }
+                }
+              },
             }
-        }
-    });
+          }
+        },
+      }
+    }
+  };
+
+  try {
+    // Call the Gemini API directly using the built-in fetch command
+    const apiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${aistudio_api_key}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    if (!apiResponse.ok) {
+      const errorText = await apiResponse.text();
+      console.error("API Error:", errorText);
+      throw new Error(`Google AI API request failed with status ${apiResponse.status}`);
+    }
+
+    const responseData = await apiResponse.json();
     
-    return new Response(response.text, {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    // Extract the JSON string from the response
+    const jsonText = responseData.candidates[0].content.parts[0].text;
+
+    // Send the clean JSON back to our frontend application
+    res.status(200).setHeader('Content-Type', 'application/json').send(jsonText);
 
   } catch (error) {
     console.error(error);
-    return new Response(JSON.stringify({ error: 'Failed to process scores.' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    res.status(500).json({ error: 'Failed to process scores.' });
   }
 }
