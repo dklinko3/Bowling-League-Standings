@@ -1,0 +1,5 @@
+{
+  "name": "Top Dawg Classic Bowling Manager",
+  "description": "An application to track league standings, schedules, and scores for the Top Dawg Classic bowling league, using real-time data to provide immediate updates.",
+  "requestFramePermissions": []
+}
